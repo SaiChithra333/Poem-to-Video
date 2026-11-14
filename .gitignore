@@ -25,10 +25,8 @@ test_*.mp3
 *TEMP_MPY*
 The_Old_Pond_???_*
 
-# Generated Video Outputs (keep folder structure)
-output/*.mp4
+# Old trial archives remain excluded
 output/archive_old_trials/
-!output/.gitkeep
 
 # Operating System & Editor Files
 .DS_Store
