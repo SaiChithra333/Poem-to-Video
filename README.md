@@ -13,28 +13,32 @@ The **Poem-to-Video** system automatically transforms classical and modern poetr
 1. **Emotion + NER Semantic Segmentation:** Automatically groups adjacent lines sharing emotion and scene entities into unified visual scenes instead of rigid 1-image-per-line cuts.
 2. **Iterative LLM Prompt Refinement:** Uses an LLM prompt self-critique loop to resolve contradictions, add spatial anchors (foreground, midground, background), and polish Stable Diffusion prompts.
 3. **Parallel Asynchronous Image Generation:** Dispatches image generation requests concurrently with rate-limiting backoff, dramatically speeding up wall-clock render times.
-4. **Stacked Multilingual Subtitles:** Automatically translates poem segments and renders stacked, high-contrast subtitles (Original language on top, translated language below) using native Windows CJK system fonts (eliminating broken glyphs / `??`).
-5. **Multilingual Speech Narration (Mode A & Mode B):** Integrates Microsoft Edge TTS (with automatic Google TTS fallback) for expressive voice recitation, supporting both primary bilingual videos and exporting localized video files per language (e.g. `_en.mp4`, `_zh.mp4`).
+4. **Stacked Multilingual Subtitles:** Automatically translates poem segments and renders stacked, high-contrast subtitles (Original language on top, translated language below) using native system CJK fonts across Windows, macOS, and Linux (eliminating broken glyphs / `??`).
+5. **Multilingual Speech Narration (Mode A & Mode B):** Integrates Microsoft Edge TTS (with automatic Google TTS fallback) for expressive voice recitation, supporting both primary bilingual videos and exporting localized video files per language (e.g. `_en.mp4`, `_zh.mp4`, `_hi.mp4`).
+6. **Multi-Modal Validation & Accuracy Metrics Suite (MQI):** An automated evaluation benchmark measuring both textual accuracy (literary grounding, 12-D completeness, translation fidelity) and visual accuracy (text-to-image VLM semantic alignment, entity recall, style adherence, color script palette match, and cross-scene visual coherence).
 
 ---
 
 ## 📁 Project File Structure
 
 ```
-RM Project/
+Poem-to-Video/
 ├── main.py                                      # CLI entry point
+├── evaluate.py                                  # Multi-modal accuracy validation CLI
 ├── requirements.txt                             # Python dependencies
 ├── .env                                         # Environment variables & API keys
 ├── README.md                                    # Project documentation & run guide
 │
 ├── src/                                         # Source Code
-│   ├── config.py                                # Settings, styles, font detection, voices
-│   ├── llm_client.py                            # Gemini LLM client with candidate fallback
+│   ├── config.py                                # Settings, styles, cross-platform font detection, voices
+│   ├── llm_client.py                            # Gemini & OpenAI LLM client with fallback
 │   ├── pipeline.py                              # Master end-to-end pipeline orchestrator
 │   │
 │   ├── comprehension/                           # MODULE 1: Textual Situational Comprehension
 │   │   ├── paraphrase.py                        # Step 1.1: Literary analysis & Emotion/NER tagging
 │   │   ├── semantic_segmentor.py                # Step 1.1b: Emotion + NER dynamic segmentation
+│   │   ├── visual_blueprint.py                  # Step 1.1c: Global color script & location consistency
+│   │   ├── sample_cache.py                      # Offline pre-computed sample poem cache
 │   │   ├── key_element_extraction.py            # Step 1.2: 12-Dimensional visual keyword extraction
 │   │   ├── prompt_refiner.py                    # Step 1.3a: LLM prompt self-critique loop
 │   │   └── prompt_generator.py                  # Step 1.3b: Positive & negative prompt builder
@@ -44,29 +48,37 @@ RM Project/
 │   │   ├── parallel_generator.py                # Step 2.1b: Concurrent parallel image generation
 │   │   └── rife_interpolation.py                # Steps 2.2 & 2.3: Ken Burns animation & cross-fades
 │   │
-│   └── video_synthesis/                         # MODULE 3: Situational Video Synthesis
-│       ├── translator.py                        # Multilingual poetic translation engine
-│       ├── tts_engine.py                        # Microsoft Edge TTS & gTTS audio narration
-│       ├── multi_tts_engine.py                  # Parallel multilingual speech synthesis
-│       ├── multi_subtitle_generator.py          # Stacked subtitle overlay with Windows fonts
-│       └── video_assembler.py                   # MoviePy final video composition & MP4 export
+│   ├── video_synthesis/                         # MODULE 3: Situational Video Synthesis
+│   │   ├── translator.py                        # Multilingual poetic translation engine
+│   │   ├── tts_engine.py                        # Microsoft Edge TTS & gTTS audio narration
+│   │   ├── multi_tts_engine.py                  # Parallel multilingual speech synthesis
+│   │   ├── ambient_soundscapes.py               # Procedural acoustic soundscapes (Guqin, Tanpura, Harp)
+│   │   ├── multi_subtitle_generator.py          # Stacked subtitle overlay with native system fonts
+│   │   └── video_assembler.py                   # MoviePy final video composition & MP4 export
+│   │
+│   └── evaluation/                              # Multi-Modal Validation & Metrics Engine
+│       ├── metrics.py                           # Text, image, palette, and VLM evaluation metrics
+│       └── report_generator.py                  # Terminal dashboard & Markdown report generator
 │
-├── output/                                      # Rendered final MP4 videos
-│   ├── Spring_Dawn_20261114_022507.mp4
-│   ├── I_wandered_lonely_as_a_cloud_20261114_023315.mp4
-│   ├── I_wandered_lonely_as_a_cloud_20261114_023315_en.mp4
-│   └── I_wandered_lonely_as_a_cloud_20261114_023315_zh.mp4
+├── output/                                      # Rendered final MP4 videos & evaluation reports
+│   ├── Agneepath_TIMESTAMP.mp4
+│   ├── The_Old_Pond_TIMESTAMP.mp4
+│   └── evaluation_pipeline_TIMESTAMP.md
 │
 └── temp/                                        # Intermediate pipeline run artifacts
     └── pipeline_YYYYMMDD_HHMMSS/
         ├── 01_paraphrase.json                   # Literary analysis output
         ├── 01b_segments.json                    # Semantic visual segments
+        ├── 01c_visual_blueprint.json            # Locked 4-color palette & location anchor
         ├── 02_key_elements.json                 # 12-dimensional extracted keywords
         ├── 03_prompts.json                      # Refined SD prompts & critique rationales
+        ├── 03_translations.json                 # Multilingual translation texts
         ├── key_frames/                          # AI artwork key frame PNGs
         ├── segment_frames/                      # Ken Burns animated sequence frames
         ├── transitions/                         # Ease-in-out cross-fade frames
-        └── tts/                                 # Synthesized voice narration MP3 files
+        ├── tts/                                 # Synthesized voice narration MP3 files
+        ├── ambient_bgm.wav                      # Synthesized background soundscape
+        └── evaluation_report.json               # Full quantitative accuracy audit
 ```
 
 ---
@@ -74,13 +86,14 @@ RM Project/
 ## ⚙️ Environment Setup
 
 ### 1. Activate Virtual Environment
-Open PowerShell or Command Prompt in the project folder and activate the existing environment:
+```bash
+# macOS / Linux
+source venv/bin/activate
 
-```powershell
-# PowerShell
+# Windows (PowerShell)
 .\venv\Scripts\Activate.ps1
 
-# Or Command Prompt
+# Windows (Command Prompt)
 .\venv\Scripts\activate.bat
 ```
 
@@ -244,19 +257,83 @@ List all styles:
 
 | Argument | Description | Default |
 | :--- | :--- | :--- |
-| `--sample <name>` | Select built-in poem: `spring_dawn`, `quiet_night`, `daffodils`, `road_not_taken`, `ozymandias` | None |
+| `--sample <name>` | Select built-in poem: `spring_dawn`, `quiet_night`, `daffodils`, `road_not_taken`, `agneepath`, etc. | None |
 | `--text "..."` | Provide custom poem text directly | None |
 | `--file <path>` | Path to text file containing a poem | None |
-| `--style <style>` | Artistic style preset | `chinese_ink` |
-| `--languages <codes>` | Target subtitle languages, comma-separated (e.g. `en,zh,fr`) | From `.env` (`en,zh`) |
+| `--style <style>` | Artistic style preset (`chinese_ink`, `watercolor`, `oil_painting`, `anime`, `digital_art`) | `chinese_ink` |
+| `--languages <codes>` | Target subtitle languages, comma-separated (e.g. `en,zh`, `hi,en`, `ja,en`) | From `.env` (`en,zh`) |
 | `--all-languages` | Render separate localized MP4 files for each target language (Mode B) | False |
-| `--frames <int>` | Number of animation frames per visual segment | `24` |
 | `--provider <prov>` | Image generation provider: `pollinations`, `huggingface`, `placeholder` | `pollinations` |
+| `--frames <int>` | Number of animation frames per visual segment | `24` |
 | `--output <name>` | Custom output video filename (without `.mp4`) | Auto-generated |
+| `--evaluate` | Automatically run Multi-Modal Validation Suite after rendering | False |
 | `--no-segmentation` | Disable semantic segmentation (forces rigid 1 image per line) | False |
 | `--no-refine` | Disable LLM prompt self-critique loop | False |
 | `--no-parallel` | Disable concurrent parallel image generation | False |
 | `--quiet` | Suppress detailed prompt output in terminal | False |
+
+---
+
+## 📊 Multi-Modal Validation & Accuracy Metrics Suite
+
+The system includes a scientific evaluation benchmark ([`evaluate.py`](file:///Users/shree/RM/Poem-to-Video/evaluate.py) & [`src/evaluation/metrics.py`](file:///Users/shree/RM/Poem-to-Video/src/evaluation/metrics.py)) that measures the accuracy of both the generated text and visuals, producing an overall **Multimodal Quality Index (MQI, 0–100)**:
+
+### 1. The 9 Evaluated Metrics
+1. **Literary Grounding & Fidelity (0–100):** Audits paraphrase accuracy, literal meaning fidelity, and lack of literary hallucination.
+2. **12-Dimensional Visual Coverage (0–100):** Evaluates completeness across all 12 visual dimensions from IEEE TLT 2024.
+3. **Translation Quality & Subtitle Fitness (0–100):** Assesses semantic preservation across target languages and subtitle brevity.
+4. **Segmentation Cohesion (0–100):** Verifies that merged lines share emotional valence and spatial setting.
+5. **Text-to-Image Semantic Alignment (0–100):** Multimodal VLM inspection (Gemini Vision) measuring how faithfully each image depicts the poetic scenario.
+6. **Entity Visual Recall (0–100%):** Object detection evaluating whether extracted poetic entities are visibly present in the frame.
+7. **Artistic Style Adherence (0–100):** VLM audit verifying brushwork, medium, and texture against the chosen art preset.
+8. **Color Script Palette Adherence (0–100):** Computer vision pixel-sampling measuring Euclidean RGB distance to the locked 4-color palette in `visual_blueprint`.
+9. **Cross-Scene Visual Coherence (0–100%):** 3D color histogram cosine similarity across consecutive scenes ($\cos(\mathbf{h}_i, \mathbf{h}_{i+1})$).
+
+### 2. How to Run Validation
+
+```bash
+# Evaluate the most recent pipeline run:
+python evaluate.py --latest
+
+# Evaluate a specific timestamped run:
+python evaluate.py --dir temp/pipeline_20261115_002920
+
+# Pure local evaluation (fast CV & text metrics, skipping VLM):
+python evaluate.py --latest --quick
+
+# Render a video and automatically run the validation suite in one command:
+python main.py --sample agneepath --evaluate
+```
+
+### 3. Sample Benchmark Results (*Agneepath - Path of Fire*)
+
+```
+════════════════════════════════════════════════════════════════════════
+        🏆 POEM-TO-VIDEO MULTI-MODAL ACCURACY BENCHMARK REPORT
+════════════════════════════════════════════════════════════════════════
+  Poem Title:        Agneepath (अग्निपथ - Path of Fire)
+  Poet:              Harivansh Rai Bachchan
+  Overall MQI Score: 89.6/100   [██████████████████░░]   Grade: A (High Fidelity)
+────────────────────────────────────────────────────────────────────────
+
+  📝 MODULE 1: TEXT ACCURACY & LITERARY FIDELITY
+  ────────────────────────────────────────────────────────────────────
+    • Literary Grounding      100.0%  [████████████████]
+    • 12-D Visual Coverage    100.0%  [████████████████]
+    • Emotion Tag Coverage    100.0%  [████████████████]
+    • NER Entity Density       56.0%  [█████████░░░░░░░]
+    • Segmentation Cohesion    90.0%  [██████████████░░]
+    • Translation Fidelity    100.0%  [████████████████]
+
+  🎨 MODULE 2: IMAGE ACCURACY & MULTIMODAL ALIGNMENT
+  ────────────────────────────────────────────────────────────────────
+    • Text-to-Image Alignment     86.0%  [██████████████░░]
+    • Artistic Style Adherence    87.2%  [██████████████░░]
+    • Entity Visual Recall        81.0%  [█████████████░░░]
+    • Color Script Palette Match  81.9%  [█████████████░░░]
+    • Cross-Scene Coherence       82.5%  [█████████████░░░]
+════════════════════════════════════════════════════════════════════════
+```
 
 ---
 

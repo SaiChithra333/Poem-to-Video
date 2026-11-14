@@ -12,9 +12,12 @@ import re
 from src.config import GEMINI_API_KEY, OPENAI_API_KEY, OPENAI_BASE_URL, LLM_MODEL, GEMINI_MODEL_FALLBACKS
 
 # Auto-detect provider
-if GEMINI_API_KEY:
+_gemini_val = GEMINI_API_KEY.strip() if GEMINI_API_KEY else ""
+_openai_val = OPENAI_API_KEY.strip() if OPENAI_API_KEY else ""
+
+if _gemini_val and not _gemini_val.startswith("your_"):
     LLM_PROVIDER = "gemini"
-elif OPENAI_API_KEY:
+elif _openai_val and not _openai_val.startswith("your_"):
     LLM_PROVIDER = "openai"
 else:
     LLM_PROVIDER = None

@@ -99,9 +99,25 @@ def run_pipeline(
     print("\n▶ MODULE 1: Textual Situational Comprehension")
     print("-" * 55)
 
+    # Check for pre-computed sample cache if LLM_PROVIDER is not set
+    from src.llm_client import LLM_PROVIDER
+    from src.comprehension.sample_cache import find_sample_key, get_cached_sample
+
+    cached_data = None
+    if not LLM_PROVIDER:
+        sample_key = find_sample_key(title_override) or find_sample_key(poem_text)
+        if sample_key:
+            cached_data = get_cached_sample(sample_key)
+            if cached_data:
+                print(f"  [Offline Demo Mode] Loaded pre-computed literary analysis for '{sample_key}'")
+
     # Step 1.1: Extended Paraphrase (with Emotion & NER tags)
     print("\n  Step 1.1: Literary Paraphrase & Emotion/NER Tagging...")
-    paraphrase_data = paraphrase_poem(poem_text, language)
+    if cached_data and "paraphrase" in cached_data:
+        paraphrase_data = cached_data["paraphrase"]
+        print("  → Using pre-computed literary analysis from sample cache")
+    else:
+        paraphrase_data = paraphrase_poem(poem_text, language)
 
     with open(work_dir / "01_paraphrase.json", "w", encoding="utf-8") as f:
         json.dump(paraphrase_data, f, indent=2, ensure_ascii=False)
@@ -127,21 +143,30 @@ def run_pipeline(
 
     # Step 1.1c: Global Visual Blueprint & Color Script (Coherence Architecture)
     print("\n  Step 1.1c: Global Visual Blueprint & Color Script...")
-    visual_blueprint = generate_visual_blueprint(paraphrase_data, segments, style=style)
+    if cached_data and "blueprint" in cached_data:
+        visual_blueprint = cached_data["blueprint"]
+        print("  → Using pre-computed visual blueprint from sample cache")
+    else:
+        visual_blueprint = generate_visual_blueprint(paraphrase_data, segments, style=style)
 
     with open(work_dir / "01c_visual_blueprint.json", "w", encoding="utf-8") as f:
         json.dump(visual_blueprint.to_dict(), f, indent=2, ensure_ascii=False)
 
     # Step 1.2: 12-Dimensional Visual Keyword Extraction
     print(f"\n  Step 1.2: 12-Dimensional Keyword Extraction for {len(segments)} segments...")
-    key_elements = extract_key_elements(segments, style, visual_blueprint=visual_blueprint)
+    if cached_data and "key_elements" in cached_data and len(cached_data["key_elements"]) == len(segments):
+        key_elements = cached_data["key_elements"]
+        print("  → Using pre-computed 12-dimensional keywords from sample cache")
+    else:
+        key_elements = extract_key_elements(segments, style, visual_blueprint=visual_blueprint)
 
     with open(work_dir / "02_key_elements.json", "w", encoding="utf-8") as f:
         json.dump(key_elements, f, indent=2, ensure_ascii=False)
 
     # Step 1.3: Prompt Generation & Iterative Refinement
     print("\n  Step 1.3: Prompt Generation & LLM Self-Critique Refinement...")
-    prompts = generate_prompts(key_elements, style, enable_refinement=enable_refinement, visual_blueprint=visual_blueprint)
+    refine_flag = False if cached_data else enable_refinement
+    prompts = generate_prompts(key_elements, style, enable_refinement=refine_flag, visual_blueprint=visual_blueprint)
 
     with open(work_dir / "03_prompts.json", "w", encoding="utf-8") as f:
         json.dump(prompts, f, indent=2, ensure_ascii=False)
@@ -208,7 +233,15 @@ def run_pipeline(
     translations = {}
     if target_langs:
         print("\n  Step 3.1a: Translating segment texts for multi-language subtitles...")
-        translations = translate_segments(segment_primary_texts, target_langs)
+        if cached_data and "translations" in cached_data:
+            for l_code in target_langs:
+                if l_code in cached_data["translations"]:
+                    translations[l_code] = cached_data["translations"][l_code]
+        if not translations:
+            translations = translate_segments(segment_primary_texts, target_langs)
+
+        with open(work_dir / "03_translations.json", "w", encoding="utf-8") as f:
+            json.dump(translations, f, indent=2, ensure_ascii=False)
 
     # Step 3.1b: TTS Speech Synthesis
     print("\n  Step 3.1b: Synthesizing narration audio...")

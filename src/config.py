@@ -107,13 +107,21 @@ LANGUAGE_VOICE_MAP = {
 # ─── System Font Detection ──────────────────────────────────────────────────
 
 def get_system_font(prefer_cjk: bool = True, text: str = "") -> str:
-    """Find a valid system font file on Windows matching script, or fallback gracefully."""
+    """Find a valid system font file on Windows, macOS, or Linux matching script, or fallback gracefully."""
+    import platform
+    is_mac = platform.system() == "Darwin"
+
     # Devanagari / Hindi script
     if text and any('\u0900' <= c <= '\u097f' for c in text):
         devanagari_fonts = [
+            "/System/Library/Fonts/Supplemental/DevanagariMT.ttc",
+            "/System/Library/Fonts/Supplemental/Devanagari Sangam MN.ttc",
+            "/System/Library/Fonts/Supplemental/ITFDevanagari.ttc",
             "C:/Windows/Fonts/Nirmala.ttc",
             "C:/Windows/Fonts/nirmala.ttf",
             "C:/Windows/Fonts/mangal.ttf",
+            "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
         ]
         for f in devanagari_fonts:
             if os.path.exists(f):
@@ -122,40 +130,57 @@ def get_system_font(prefer_cjk: bool = True, text: str = "") -> str:
     # Japanese Kana script
     if text and any('\u3040' <= c <= '\u30ff' for c in text):
         jp_fonts = [
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            "/System/Library/Fonts/AquaKana.ttc",
             "C:/Windows/Fonts/msgothic.ttc",
             "C:/Windows/Fonts/YuGothR.ttc",
             "C:/Windows/Fonts/meiryo.ttc",
             "C:/Windows/Fonts/msyh.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         ]
         for f in jp_fonts:
             if os.path.exists(f):
                 return f
 
-    windows_cjk_fonts = [
+    cjk_fonts = [
+        "/System/Library/Fonts/Supplemental/Songti.ttc",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
         "C:/Windows/Fonts/msyh.ttc",     # Microsoft YaHei
         "C:/Windows/Fonts/msyhbd.ttc",   # Microsoft YaHei Bold
         "C:/Windows/Fonts/simhei.ttf",   # SimHei
         "C:/Windows/Fonts/simsun.ttc",   # SimSun
         "C:/Windows/Fonts/kaiu.ttf",     # DFKai-SB
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     ]
-    windows_general_fonts = [
+    general_fonts = [
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
         "C:/Windows/Fonts/segoeui.ttf",  # Segoe UI
         "C:/Windows/Fonts/arial.ttf",     # Arial
         "C:/Windows/Fonts/calibri.ttf",   # Calibri
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
 
     if prefer_cjk:
-        for f in windows_cjk_fonts:
+        for f in cjk_fonts:
             if os.path.exists(f):
                 return f
 
-    for f in windows_general_fonts:
+    for f in general_fonts:
         if os.path.exists(f):
             return f
 
-    for f in windows_cjk_fonts:
+    for f in cjk_fonts:
         if os.path.exists(f):
             return f
+
+    if is_mac and os.path.exists("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"):
+        return "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"
+    if is_mac and os.path.exists("/System/Library/Fonts/Helvetica.ttc"):
+        return "/System/Library/Fonts/Helvetica.ttc"
 
     return "DejaVu-Sans"
 

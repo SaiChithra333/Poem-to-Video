@@ -382,6 +382,10 @@ Examples:
         "--quiet", action="store_true",
         help="Suppress verbose prompt output"
     )
+    parser.add_argument(
+        "--evaluate", action="store_true",
+        help="Run multi-modal validation metrics suite after video rendering"
+    )
 
     # Info commands
     parser.add_argument("--list-styles", action="store_true", help="List available styles")
@@ -439,10 +443,21 @@ Examples:
 
     # Verify LLM provider
     from src.llm_client import LLM_PROVIDER
+    from src.comprehension.sample_cache import find_sample_key
     if not LLM_PROVIDER:
-        print("⚠ Warning: No LLM API key configured in .env file.")
-        print("  GEMINI_API_KEY or OPENAI_API_KEY is required for Module 1.")
-        sys.exit(1)
+        matched_sample = find_sample_key(args.sample or poem_text)
+        if matched_sample:
+            print(f"ℹ No LLM API key detected in .env — running with pre-computed literary analysis for '{matched_sample}'.")
+            print("  (To enable live Gemini AI comprehension for custom poems, add your GEMINI_API_KEY to .env)\n")
+        else:
+            print("⚠ Warning: No LLM API key configured in .env file.")
+            print("  GEMINI_API_KEY or OPENAI_API_KEY is required for custom poems in Module 1.")
+            print("  Get a free Gemini API key at https://aistudio.google.com/ and set GEMINI_API_KEY in .env")
+            print("  Or run a built-in demo sample without an API key:")
+            print("    python main.py --sample spring_dawn --provider placeholder")
+            print("    python main.py --sample daffodils --provider placeholder")
+            print("    python main.py --sample quiet_night --provider placeholder")
+            sys.exit(1)
 
     target_langs = None
     if target_langs_str:
@@ -467,6 +482,21 @@ Examples:
             verbose=not args.quiet,
         )
         print(f"\n  🎬 Video rendered successfully at:\n     {output_path}\n")
+
+        # Run validation metrics if requested
+        if args.evaluate:
+            from evaluate import get_latest_pipeline_dir
+            from src.evaluation.metrics import evaluate_pipeline_run
+            from src.evaluation.report_generator import print_evaluation_dashboard, generate_markdown_report
+            from src.config import OUTPUT_DIR
+
+            run_dir = get_latest_pipeline_dir()
+            if run_dir:
+                eval_report = evaluate_pipeline_run(run_dir, poem_text=poem_text)
+                print_evaluation_dashboard(eval_report)
+                md_path = OUTPUT_DIR / f"evaluation_{run_dir.name}.md"
+                generate_markdown_report(eval_report, md_path)
+                print(f"  📄 Detailed Markdown report saved to:\n     {md_path}\n")
 
     except KeyboardInterrupt:
         print("\n\n  Pipeline interrupted by user.")
