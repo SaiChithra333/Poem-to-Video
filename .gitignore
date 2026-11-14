@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+ENV/
+*.venv/
+
+# Environment variables & secrets (NEVER commit secrets!)
+.env
+.env.local
+.env.*.local
+env
+
+# Temporary execution artifacts and logs
+temp/
+*.log
+debug_*.txt
+error*.txt
+test_*.png
+test_*.mp3
+*TEMP_MPY*
+The_Old_Pond_???_*
+
+# Generated Video Outputs (keep folder structure)
+output/*.mp4
+output/archive_old_trials/
+!output/.gitkeep
+
+# Operating System & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
