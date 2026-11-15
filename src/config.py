@@ -164,8 +164,31 @@ def get_system_font(prefer_cjk: bool = True, text: str = "") -> str:
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
 
+    # Check for CJK ideographs
+    has_cjk = bool(text and any(
+        ('\u4e00' <= c <= '\u9fff') or ('\u3400' <= c <= '\u4dbf') or ('\uf900' <= c <= '\ufaff')
+        for c in text
+    ))
+
+    # If text explicitly contains CJK characters, prioritize CJK fonts
+    if has_cjk:
+        for f in cjk_fonts:
+            if os.path.exists(f):
+                return f
+
+    # If text has Latin/Western characters and NO CJK or Devanagari, prioritize crisp Latin typography
+    if text and not has_cjk:
+        for f in general_fonts:
+            if os.path.exists(f):
+                return f
+
+    # Fallback when text is empty: honor prefer_cjk preference
     if prefer_cjk:
         for f in cjk_fonts:
+            if os.path.exists(f):
+                return f
+    else:
+        for f in general_fonts:
             if os.path.exists(f):
                 return f
 

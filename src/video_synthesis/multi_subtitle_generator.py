@@ -3,10 +3,11 @@ Multi-Language Subtitle Generator — Module 3, Enhancement 4
 
 Generates stacked, dual-track / multi-language subtitle clips.
 Positions:
-  - Original text at top (65% left, 35% top), font size ~26-30pt with black stroke.
-  - Translated text below (65% left, 50% top), font size ~20-22pt with subtle outline.
-Uses detected Windows system fonts (e.g. Microsoft YaHei / SimSun / Arial)
-so Chinese characters and Western alphabets render with high visual clarity.
+  - Original text at top, font size ~26-28pt with black stroke.
+  - Translated text below, font size ~20-22pt with subtle outline.
+Uses script-aware system font routing (Segoe UI / YaHei / MS Gothic / Nirmala)
+with explicit margins and dynamic vertical centering to ensure NO characters
+or descenders are ever clipped or cut off by screen boundaries.
 
 Reference: Section 4.4 and Section 8.1 of Progress.docx.
 """
@@ -15,27 +16,39 @@ from moviepy import TextClip, CompositeVideoClip, vfx
 from src.config import IMAGE_WIDTH, IMAGE_HEIGHT, get_system_font
 
 
-def _wrap_text(text: str, max_chars: int = 24) -> str:
-    """Wrap text to prevent overflow."""
-    if len(text) <= max_chars:
-        return text
-    # Chinese text wrapping
-    if any('\u4e00' <= c <= '\u9fff' for c in text):
-        chunks = [text[i:i+max_chars] for i in range(0, len(text), max_chars)]
-        return "\n".join(chunks)
-    # Western text wrapping on spaces
-    words = text.split()
-    lines = []
-    curr = ""
-    for w in words:
-        if len(curr) + len(w) + 1 > max_chars:
-            lines.append(curr.strip())
-            curr = w
+def _wrap_text(text: str, max_chars: int = 40) -> str:
+    """Wrap text to prevent horizontal overflow while respecting natural word boundaries."""
+    if not text:
+        return ""
+    # If text already contains explicit newlines from couplets, wrap each line individually
+    input_lines = text.split("\n")
+    all_wrapped = []
+    for line in input_lines:
+        line = line.strip()
+        if not line:
+            continue
+        if len(line) <= max_chars:
+            all_wrapped.append(line)
+            continue
+        # CJK text wrapping
+        if any(('\u4e00' <= c <= '\u9fff') or ('\u3040' <= c <= '\u30ff') for c in line):
+            cjk_limit = min(max_chars, 24)
+            chunks = [line[i:i + cjk_limit] for i in range(0, len(line), cjk_limit)]
+            all_wrapped.extend(chunks)
         else:
-            curr += " " + w
-    if curr:
-        lines.append(curr.strip())
-    return "\n".join(lines)
+            # Western / Latin word wrapping on space
+            words = line.split()
+            curr = ""
+            for w in words:
+                if len(curr) + len(w) + 1 > max_chars:
+                    if curr:
+                        all_wrapped.append(curr.strip())
+                    curr = w
+                else:
+                    curr = (curr + " " + w).strip()
+            if curr:
+                all_wrapped.append(curr.strip())
+    return "\n".join(all_wrapped)
 
 
 def create_stacked_subtitle_clip(
@@ -46,6 +59,8 @@ def create_stacked_subtitle_clip(
 ) -> CompositeVideoClip:
     """
     Create a composite clip containing primary + translated subtitles stacked vertically.
+    Dynamically measures all text blocks and centers/anchors the stack to ensure
+    zero descender clipping and zero screen boundary overflow.
 
     Args:
         primary_text: The original poem line or segment text.
@@ -56,64 +71,82 @@ def create_stacked_subtitle_clip(
     Returns:
         CompositeVideoClip with transparent background holding stacked subtitles.
     """
-    font_primary = get_system_font(prefer_cjk=True, text=primary_text)
-    sub_clips = []
-
     fade_dur = min(0.4, duration * 0.15)
-    box_width = int(IMAGE_WIDTH * 0.45)
+
+    if position == "right_center":
+        box_width = int(IMAGE_WIDTH * 0.45)
+        x_pos = int(IMAGE_WIDTH * 0.52)
+        max_c = 28
+    else:
+        box_width = int(IMAGE_WIDTH * 0.82)
+        x_pos = (IMAGE_WIDTH - box_width) // 2
+        max_c = 44
+
+    unpositioned_clips = []
 
     # 1. Primary Text Clip (Original Language)
-    wrapped_primary = _wrap_text(primary_text, max_chars=22)
+    wrapped_primary = _wrap_text(primary_text, max_chars=max_c)
+    font_primary = get_system_font(prefer_cjk=False, text=primary_text)
     clip_primary = TextClip(
         text=wrapped_primary,
         font=font_primary,
-        font_size=28,
+        font_size=26,
         color="white",
         stroke_color="black",
         stroke_width=2,
+        margin=(16, 12),
+        interline=6,
         method="caption",
         size=(box_width, None),
         text_align="center"
     ).with_duration(duration)
-
-    if position == "right_center":
-        x_pos = int(IMAGE_WIDTH * 0.52)
-        y_pos = int(IMAGE_HEIGHT * 0.35)
-    else:
-        x_pos = int((IMAGE_WIDTH - box_width) // 2)
-        y_pos = int(IMAGE_HEIGHT * 0.65)
-
-    clip_primary = clip_primary.with_position((x_pos, y_pos))
-    clip_primary = clip_primary.with_effects([vfx.FadeIn(fade_dur), vfx.FadeOut(fade_dur)])
-    sub_clips.append(clip_primary)
+    unpositioned_clips.append(clip_primary)
 
     # 2. Translated Text Clip(s) stacked beneath
-    curr_y = y_pos + clip_primary.size[1] + 10
-
-    for i, trans_txt in enumerate(translated_texts):
+    for trans_txt in translated_texts:
         if not trans_txt or trans_txt.strip() == primary_text.strip():
             continue
 
-        wrapped_trans = _wrap_text(trans_txt, max_chars=28)
-        font_trans = get_system_font(prefer_cjk=True, text=trans_txt)
+        wrapped_trans = _wrap_text(trans_txt, max_chars=int(max_c * 1.15))
+        font_trans = get_system_font(prefer_cjk=False, text=trans_txt)
         clip_trans = TextClip(
             text=wrapped_trans,
             font=font_trans,
             font_size=20,
-            color="#E0E6ED",  # Soft luminous light-grey
+            color="#E2E8F0",  # Soft luminous light-grey
             stroke_color="black",
             stroke_width=2,
+            margin=(14, 10),
+            interline=5,
             method="caption",
             size=(box_width, None),
             text_align="center"
         ).with_duration(duration)
+        unpositioned_clips.append(clip_trans)
 
-        clip_trans = clip_trans.with_position((x_pos, curr_y))
-        clip_trans = clip_trans.with_effects([vfx.FadeIn(fade_dur), vfx.FadeOut(fade_dur)])
-        sub_clips.append(clip_trans)
-        curr_y += clip_trans.size[1] + 8
+    # 3. Dynamic Vertical Anchoring to prevent clipping
+    spacing = 6
+    total_stack_height = sum(c.size[1] for c in unpositioned_clips) + spacing * (len(unpositioned_clips) - 1)
 
-    composite = CompositeVideoClip(sub_clips, size=(IMAGE_WIDTH, IMAGE_HEIGHT)).with_duration(duration)
+    if position == "right_center":
+        # Centered vertically in the right portion of the frame
+        ideal_y = (IMAGE_HEIGHT - total_stack_height) // 2
+        # Clamp strictly between 24px from top and 24px from bottom
+        start_y = max(24, min(ideal_y, IMAGE_HEIGHT - total_stack_height - 24))
+    else:
+        # Anchored to the lower third with 24px safe bottom margin
+        start_y = max(24, IMAGE_HEIGHT - total_stack_height - 24)
+
+    # 4. Position each clip and apply smooth fade transitions
+    positioned_clips = []
+    curr_y = start_y
+    for clip in unpositioned_clips:
+        c = clip.with_position((x_pos, curr_y))
+        c = c.with_effects([vfx.FadeIn(fade_dur), vfx.FadeOut(fade_dur)])
+        positioned_clips.append(c)
+        curr_y += clip.size[1] + spacing
+
+    composite = CompositeVideoClip(positioned_clips, size=(IMAGE_WIDTH, IMAGE_HEIGHT)).with_duration(duration)
     return composite
 
 
@@ -123,22 +156,24 @@ def create_title_clip(
     duration: float = 4.0
 ) -> CompositeVideoClip:
     """
-    Create a title card displaying the poem's title and author.
+    Create a title card displaying the poem's title and author with safe margins.
     """
     display_text = title
     if poet:
         display_text += f"\n\n— {poet}"
 
-    font_file = get_system_font(prefer_cjk=True, text=display_text)
-    box_width = int(IMAGE_WIDTH * 0.8)
+    font_file = get_system_font(prefer_cjk=False, text=display_text)
+    box_width = int(IMAGE_WIDTH * 0.82)
 
     txt_clip = TextClip(
         text=display_text,
         font=font_file,
-        font_size=42,
+        font_size=40,
         color="white",
         stroke_color="black",
         stroke_width=2,
+        margin=(20, 16),
+        interline=8,
         method="caption",
         size=(box_width, None),
         text_align="center"
